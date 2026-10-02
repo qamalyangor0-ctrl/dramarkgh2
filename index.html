@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="hy">
+<head>
+<meta charset="utf-8">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#17324d">
+<link rel="apple-touch-icon" href="./icons/icon-192.png"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Հաշվառում</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f5f7;color:#17212b}
+header{background:#17324d;color:white;padding:17px;font-size:23px;font-weight:bold}
+nav{display:flex;overflow:auto;background:white;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:3}
+nav button{border:0;background:white;padding:13px 15px;white-space:nowrap;font-weight:bold;color:#53606c}
+nav button.active{color:#17324d;border-bottom:3px solid #17324d}
+.wrap{max-width:900px;margin:auto;padding:12px}.page{display:none}.page.active{display:block}
+.card{background:white;border-radius:15px;padding:16px;margin:10px 0;box-shadow:0 2px 9px #0001}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.box{background:#f1f4f7;border-radius:12px;padding:13px}.box b{display:block;font-size:21px;margin-top:5px}
+input,select{width:100%;padding:12px;border:1px solid #ccd3da;border-radius:9px;font-size:16px;margin:6px 0 12px}
+button{cursor:pointer}.btn{border:0;border-radius:10px;padding:13px;font-size:16px;font-weight:bold}.primary{background:#17324d;color:white}.in{background:#218838;color:white}.out{background:#c82333;color:white}.warn{background:#e6a700;color:white}.light{background:#e9edf1}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:9px 6px;border-bottom:1px solid #e5e8eb;text-align:left}th{color:#65717c}
+.green{color:#218838}.red{color:#c82333}.muted{color:#6d7882}.danger{color:#c82333;border:0;background:none}
+.actions{display:flex;gap:7px;flex-wrap:wrap}.actions button{padding:9px 11px;border:0;border-radius:8px}
+h2,h3{margin-top:4px}.big{font-size:30px;font-weight:bold;text-align:center}
+@media(max-width:600px){.grid3{grid-template-columns:1fr}.grid{grid-template-columns:1fr 1fr}table{font-size:13px}}
+</style>
+
+<script>
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {})); }
+</script>
+</head>
+<body>
+<header>Հաշվառում / Դրամարկղ</header>
+<nav>
+<button class="active" onclick="page('home',this)">Գլխավոր</button>
+<button onclick="page('cash',this)">Դրամարկղ</button>
+<button onclick="page('sales',this)">Վաճառք</button>
+<button onclick="page('stock',this)">Պահեստ</button>
+<button onclick="page('debts',this)">Պարտքեր</button>
+<button onclick="page('reports',this)">Հաշվետվություն</button>
+</nav>
+<div class="wrap">
+
+<section id="home" class="page active">
+<div class="card"><div class="muted">Ընթացիկ դրամարկղ</div><div class="big" id="homeBal">0 դր.</div></div>
+<div class="grid3">
+<div class="box">Այսօրվա վաճառք<b id="hSale">0 դր.</b></div>
+<div class="box">Այսօրվա մուտք<b class="green" id="hIn">0 դր.</b></div>
+<div class="box">Այսօրվա ելք<b class="red" id="hOut">0 դր.</b></div>
+</div>
+<div class="card"><h3>Արագ գործողություններ</h3><div class="grid">
+<button class="btn in" onclick="page('cash');setTimeout(()=>document.getElementById('amount').focus(),50)">＋ Մուտք</button>
+<button class="btn out" onclick="page('cash');setTimeout(()=>document.getElementById('amount').focus(),50)">− Ելք</button>
+</div></div>
+</section>
+
+<section id="cash" class="page">
+<div class="card"><h2>Դրամարկղ</h2><div class="big" id="cashBal">0 դր.</div></div>
+<div class="card">
+<label>Գումար</label><input id="amount" type="number" inputmode="decimal" min="0" placeholder="Գումար">
+<label>Նկարագրություն</label><input id="cashNote" placeholder="Օր.՝ վաճառք, գնում, ծախս">
+<div class="grid"><button class="btn in" onclick="cashTx('in')">＋ ՄՈՒՏՔ</button><button class="btn out" onclick="cashTx('out')">− ԵԼՔ</button></div>
+</div>
+<div class="card"><h3>Վերջին գործարքներ</h3><div style="overflow:auto"><table><thead><tr><th>Ամսաթիվ</th><th>Տեսակ</th><th>Նկարագրություն</th><th>Գումար</th><th>Մն.</th></tr></thead><tbody id="cashRows"></tbody></table></div></div>
+</section>
+
+<section id="sales" class="page">
+<div class="card"><h2>Վաճառք</h2>
+<label>Ապրանք</label><select id="saleProduct"></select>
+<div class="grid"><div><label>Քանակ</label><input id="saleQty" type="number" min="1" value="1"></div><div><label>Գին</label><input id="salePrice" type="number" min="0" placeholder="0"></div></div>
+<label>Հաճախորդ</label><input id="saleCustomer" placeholder="Անուն (ըստ ցանկության)">
+<button class="btn primary" onclick="makeSale()" style="width:100%">Գրանցել վաճառքը</button>
+</div>
+<div class="card"><h3>Վաճառքների պատմություն</h3><div style="overflow:auto"><table><thead><tr><th>Ամսաթիվ</th><th>Ապրանք</th><th>Քանակ</th><th>Ընդհանուր</th><th>Հաճախորդ</th></tr></thead><tbody id="saleRows"></tbody></table></div></div>
+</section>
+
+<section id="stock" class="page">
+<div class="card"><h2>Պահեստ</h2>
+<input id="pName" placeholder="Ապրանքի անուն">
+<div class="grid3"><input id="pQty" type="number" min="0" placeholder="Քանակ"><input id="pBuy" type="number" min="0" placeholder="Ինքնարժեք"><input id="pSell" type="number" min="0" placeholder="Վաճառքի գին"></div>
+<button class="btn primary" onclick="addProduct()">＋ Ավելացնել ապրանք</button>
+</div>
+<div class="card"><div style="overflow:auto"><table><thead><tr><th>Ապրանք</th><th>Քանակ</th><th>Ինքնարժեք</th><th>Վաճառքի գին</th><th></th></tr></thead><tbody id="stockRows"></tbody></table></div></div>
+</section>
+
+<section id="debts" class="page">
+<div class="card"><h2>Հաճախորդների պարտքեր</h2>
+<input id="dName" placeholder="Հաճախորդի անուն">
+<div class="grid"><input id="dAmount" type="number" min="0" placeholder="Գումար"><input id="dNote" placeholder="Նկարագրություն"></div>
+<div class="grid"><button class="btn warn" onclick="addDebt('debt')">＋ Պարտք</button><button class="btn in" onclick="addDebt('pay')">✓ Մարում</button></div>
+</div>
+<div class="card"><div style="overflow:auto"><table><thead><tr><th>Ամսաթիվ</th><th>Հաճախորդ</th><th>Գործողություն</th><th>Գումար</th><th>Մնացորդ</th></tr></thead><tbody id="debtRows"></tbody></table></div></div>
+</section>
+
+<section id="reports" class="page">
+<div class="card"><h2>Հաշվետվություն</h2>
+<label>Ամիս</label><input id="reportMonth" type="month" onchange="render()">
+<div class="grid3">
+<div class="box">Վաճառք<b id="rSales">0 դր.</b></div><div class="box">Մուտք<b id="rIn">0 դր.</b></div><div class="box">Ելք<b class="red" id="rOut">0 դր.</b></div>
+</div>
+<div class="box" style="margin-top:10px">Վաճառքից հաշվարկված շահույթ<b id="rProfit">0 դր.</b></div>
+</div>
+<div class="card"><div class="actions"><button class="light" onclick="exportCSV()">Արտահանել CSV</button><button class="light" onclick="backup()">Պահուստային պատճեն</button><button class="light" onclick="restore()">Վերականգնել պատճենը</button><button class="danger" onclick="wipe()">Ջնջել ամբողջ տվյալները</button></div></div>
+</section>
+</div>
+<script>
+const K='accounting_v2';
+let db=JSON.parse(localStorage.getItem(K)||'{"cash":[],"products":[],"sales":[],"debts":[]}');
+function save(){localStorage.setItem(K,JSON.stringify(db));render();}
+function fmt(n){return new Intl.NumberFormat('hy-AM').format(Math.round(n))+' դր.'}
+function stamp(){let d=new Date(),p=n=>String(n).padStart(2,'0');return {date:`${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()}`,time:`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,month:`${d.getFullYear()}-${p(d.getMonth()+1)}`}}
+function page(id,btn){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');render();}
+function cashBalance(){return db.cash.reduce((s,x)=>s+(x.type==='in'?x.amount:-x.amount),0)}
+function cashTx(type){let a=Number(document.getElementById('amount').value);if(a<=0)return alert('Գրիր գումարը։');let n=stamp();db.cash.push({date:n.date,time:n.time,month:n.month,type,amount:a,note:document.getElementById('cashNote').value});document.getElementById('amount').value='';document.getElementById('cashNote').value='';save();}
+function addProduct(){let name=document.getElementById('pName').value.trim(),q=Number(document.getElementById('pQty').value),buy=Number(document.getElementById('pBuy').value),sell=Number(document.getElementById('pSell').value);if(!name)return alert('Գրիր ապրանքի անունը։');db.products.push({id:Date.now(),name,qty:q,buy,sell});document.getElementById('pName').value='';save();}
+function makeSale(){let id=Number(document.getElementById('saleProduct').value),p=db.products.find(x=>x.id===id),q=Number(document.getElementById('saleQty').value),price=Number(document.getElementById('salePrice').value||p?.sell);if(!p||q<=0||price<0)return alert('Լրացրու վաճառքի տվյալները։');if(p.qty<q)return alert('Պահեստում բավարար քանակ չկա։');p.qty-=q;let n=stamp(),total=q*price;db.sales.push({date:n.date,time:n.time,month:n.month,pid:id,name:p.name,qty:q,price,total,buy:p.buy,customer:document.getElementById('saleCustomer').value});db.cash.push({date:n.date,time:n.time,month:n.month,type:'in',amount:total,note:'Վաճառք՝ '+p.name});document.getElementById('saleCustomer').value='';save();}
+function addDebt(type){let name=document.getElementById('dName').value.trim(),a=Number(document.getElementById('dAmount').value);if(!name||a<=0)return alert('Լրացրու անունն ու գումարը։');let n=stamp();db.debts.push({date:n.date,time:n.time,month:n.month,name,type,amount:a,note:document.getElementById('dNote').value});if(type==='pay')db.cash.push({date:n.date,time:n.time,month:n.month,type:'in',amount:a,note:'Պարտքի մարում՝ '+name});document.getElementById('dAmount').value='';document.getElementById('dNote').value='';save();}
+function render(){let b=cashBalance(),t=stamp();document.getElementById('homeBal').textContent=fmt(b);document.getElementById('cashBal').textContent=fmt(b);
+let ti=db.cash.filter(x=>x.date===t.date&&x.type==='in').reduce((s,x)=>s+x.amount,0),to=db.cash.filter(x=>x.date===t.date&&x.type==='out').reduce((s,x)=>s+x.amount,0),ts=db.sales.filter(x=>x.date===t.date).reduce((s,x)=>s+x.total,0);
+document.getElementById('hIn').textContent=fmt(ti);document.getElementById('hOut').textContent=fmt(to);document.getElementById('hSale').textContent=fmt(ts);
+let bal=0;document.getElementById('cashRows').innerHTML=db.cash.map(x=>{bal+=x.type==='in'?x.amount:-x.amount;return `<tr><td>${x.date}<br>${x.time}</td><td class="${x.type==='in'?'green':'red'}">${x.type==='in'?'Մուտք':'Ելք'}</td><td>${esc(x.note||'—')}</td><td>${x.type==='in'?'+':'−'}${fmt(x.amount)}</td><td>${fmt(bal)}</td></tr>`}).join('')||empty(5);
+document.getElementById('saleProduct').innerHTML=db.products.map(p=>`<option value="${p.id}">${esc(p.name)} — ${fmt(p.sell)} (${p.qty} հատ)</option>`).join('');
+document.getElementById('stockRows').innerHTML=db.products.map(p=>`<tr><td>${esc(p.name)}</td><td>${p.qty}</td><td>${fmt(p.buy)}</td><td>${fmt(p.sell)}</td><td><button onclick="delP(${p.id})">✕</button></td></tr>`).join('')||empty(5);
+document.getElementById('saleRows').innerHTML=db.sales.slice().reverse().map(x=>`<tr><td>${x.date}<br>${x.time}</td><td>${esc(x.name)}</td><td>${x.qty}</td><td>${fmt(x.total)}</td><td>${esc(x.customer||'—')}</td></tr>`).join('')||empty(5);
+let dr={};db.debts.forEach(x=>{dr[x.name]=(dr[x.name]||0)+(x.type==='debt'?x.amount:-x.amount)});let running={};document.getElementById('debtRows').innerHTML=db.debts.map(x=>{running[x.name]=(running[x.name]||0)+(x.type==='debt'?x.amount:-x.amount);return `<tr><td>${x.date}</td><td>${esc(x.name)}</td><td>${x.type==='debt'?'Պարտք':'Մարում'}</td><td>${fmt(x.amount)}</td><td>${fmt(running[x.name])}</td></tr>`}).join('')||empty(5);
+let m=document.getElementById('reportMonth').value||t.month;document.getElementById('reportMonth').value=m;let sales=db.sales.filter(x=>x.month===m),cash=db.cash.filter(x=>x.month===m);let sale=sales.reduce((s,x)=>s+x.total,0),cin=cash.filter(x=>x.type==='in').reduce((s,x)=>s+x.amount,0),cout=cash.filter(x=>x.type==='out').reduce((s,x)=>s+x.amount,0),profit=sales.reduce((s,x)=>s+(x.price-x.buy)*x.qty,0);document.getElementById('rSales').textContent=fmt(sale);document.getElementById('rIn').textContent=fmt(cin);document.getElementById('rOut').textContent=fmt(cout);document.getElementById('rProfit').textContent=fmt(profit);}
+function delP(id){if(confirm('Ջնջե՞լ ապրանքը։')){db.products=db.products.filter(p=>p.id!==id);save();}}
+function empty(n){return `<tr><td colspan="${n}" class="muted">Տվյալ չկա</td></tr>`}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+function backup(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='backup_dramarkgh.json';a.click();}
+function restore(){let i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=e=>{let r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);save();alert('Վերականգնվեց։')}catch{alert('Սխալ ֆայլ։')}};r.readAsText(e.target.files[0])};i.click();}
+function exportCSV(){let rows=[['Ամսաթիվ','Ժամ','Տեսակ','Նկարագրություն','Գումար']];db.cash.forEach(x=>rows.push([x.date,x.time,x.type==='in'?'Մուտք':'Ելք',x.note||'',x.type==='in'?x.amount:-x.amount]));let csv='\uFEFF'+rows.map(r=>r.map(x=>`"${String(x).replaceAll('"','""')}"`).join(',')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='dramarkgh.csv';a.click();}
+function wipe(){if(confirm('Վերջնականապես ջնջե՞լ բոլոր տվյալները։')){db={cash:[],products:[],sales:[],debts:[]};save();}}
+render();
+</script>
+</body></html>
